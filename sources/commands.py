@@ -12,9 +12,11 @@ import sources.core as core
 
 
 app=typer.Typer(no_args_is_help=True)
+DEFAULT_COUNT=10
+DEFAULT_LENGTH=20
 
 @app.command()
-def generate(length: int=20,count: int=10,output_path : t.Union[str,None]=None):
+def generate(length: int=DEFAULT_LENGTH,count: int=DEFAULT_COUNT,output_path : t.Union[str,None]=None):
     
     high_password_count=1000
     
