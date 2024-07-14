@@ -4,13 +4,56 @@ import os
 import pathlib
 import re
 import random
+import shutil
+class CLI():
+    from sources.commands import DEFAULT_COUNT,DEFAULT_LENGTH
+    TEST_PATH=pathlib.Path('tests')
+    TMP_PATH=TEST_PATH.joinpath('tmp')
+    SCREENS_PATH=TEST_PATH.joinpath('screens')
+    PASSWORD_PATTERN=r'^[A-z0-9]+$'
 
+    
+    @classmethod
+    def generate(cls,count : int=DEFAULT_COUNT,length : int=DEFAULT_LENGTH,output : str=None,strip_stdout : bool=True):
+        arguments=['generate']
+        argument_map={
+            '--count':count,
+            '--length':length,
+            '--output-path':output
+        }
+        for arg,value in argument_map.items():
+            if value:
+                arguments.append(arg)
+                arguments.append(str(value))
 
+        std_out=cls.run_command(arguments)
+        if strip_stdout:
+            std_out=list(map(lambda x: x.strip(),std_out))
+        
+        return std_out
+    
+    @classmethod
+    def run_command(cls,args : list[str]=[])-> list[str]:
+        with open(cls.TMP_PATH.joinpath('help.txt'),'w+',encoding='utf-8') as f:
+            process_args=['python3','.']
+            process_args.extend(args)
+            process : subprocess.CompletedProcess =subprocess.run(process_args,stdout=f,stderr=subprocess.DEVNULL,stdin=subprocess.DEVNULL)
+            try:
+                process.check_returncode()
+            except subprocess.CalledProcessError as e:
+                print('Process did not complete sucesufully')
+                print(e)
+                exit(1)
+            f.seek(0)
+            output=f.readlines()
+            return output
 
 class MyTestCase(unittest.TestCase):
     
     def setUp(self) -> None:
         self.maxDiff=None
+
+
     
     
     @staticmethod
@@ -45,6 +88,14 @@ class MyTestCase(unittest.TestCase):
     def assertProgramExitCode(self,exit_code : int):
         self.assertEqual(exit_code,0,'Program did not terminate sucessufully')
         
+    def assertPasswordsWereGeneratedCorrectly(self,lines_of_stdout : list[str],password_regex : re.Pattern=CLI.PASSWORD_PATTERN,
+                                              expected_length : int=CLI.DEFAULT_LENGTH,expected_count: int=CLI.DEFAULT_COUNT):
+        self.assertPasswordsCount(lines_of_stdout,expected_count)
+
+        self.assertPasswordsArePasswords(lines_of_stdout,password_regex)
+        self.assertPasswordsAreGivenLength(lines_of_stdout,expected_length)
+        
+        
     def assertCLILayout(self,filepath: pathlib.Path,lines_of_stdout : list[str]):
         with open(filepath) as f:
             file_contents=f.readlines()
@@ -55,34 +106,7 @@ class MyTestCase(unittest.TestCase):
     
         
 
-class CLI():
-    TEST_PATH=pathlib.Path('tests')
-    TMP_PATH=TEST_PATH.joinpath('tmp')
-    SCREENS_PATH=TEST_PATH.joinpath('screens')
-    
 
-    
-    @classmethod
-    def generate(cls,args=[]):
-        arguments=['generate']
-        arguments.extend(args)
-        return cls.run_command(arguments)
-    
-    @classmethod
-    def run_command(cls,args : list[str]=[])-> list[str]:
-        with open(cls.TMP_PATH.joinpath('help.txt'),'w+',encoding='utf-8') as f:
-            process_args=['python3','.']
-            process_args.extend(args)
-            process : subprocess.CompletedProcess =subprocess.run(process_args,stdout=f,stderr=subprocess.DEVNULL,stdin=subprocess.DEVNULL)
-            try:
-                process.check_returncode()
-            except subprocess.CalledProcessError as e:
-                print('Process did not complete sucesufully')
-                print(e)
-                exit(1)
-            f.seek(0)
-            output=f.readlines()
-            return output
     
     
 
@@ -95,7 +119,7 @@ class TestHelpCommand(MyTestCase):
         return super().setUp()
     
 
-    def test_help_menu_is_rendering_when_no_args_are_given(self):
+    def test_menu_is_rendering_when_no_args_are_given(self):
         
         std_out=CLI.run_command()
         self.assertCLILayout(self.HELP_SCREEN_PATH,std_out)
@@ -114,61 +138,72 @@ class TestHelpCommand(MyTestCase):
 
         
 class TestGenerateCommand(MyTestCase):
-    from sources.commands import DEFAULT_COUNT,DEFAULT_LENGTH
+
 
     def setUp(self) -> None:
-        self.PASSWORD_PATTERN=r'^[A-z1-9]+$'
+        self.SUBSTEST_COUNT=10
+
+
     
-    def test_generate_is_generating_passwords(self):
+    def test_is_generating_passwords_using_default_args(self):
         lines_of_stdout=CLI.generate()
-        
-        self.assertPasswordsCount(lines_of_stdout,len(lines_of_stdout))
+        self.assertPasswordsWereGeneratedCorrectly(lines_of_stdout)
 
-        self.assertPasswordsArePasswords(lines_of_stdout,self.PASSWORD_PATTERN)
-        self.assertPasswordsAreGivenLength(lines_of_stdout,self.DEFAULT_LENGTH)
-        
-        
-    def test_length_arg_is_working(self):
-        for i in range(0,10):
-            with self.subTest(f'Generating random arguments, iteration: {i}'):
-                random_length=str(random.randrange(1,100))
-                lines_of_stdout=CLI.generate(['--length',random_length])
-                
-                self.assertPasswordsCount(lines_of_stdout,len(lines_of_stdout))
+    
 
-                self.assertPasswordsArePasswords(lines_of_stdout,self.PASSWORD_PATTERN)
-                self.assertPasswordsAreGivenLength(lines_of_stdout,random_length)
-        
-        
-    def test_count_arg_is_working(self):
-        for i in range(0,10):
-            with self.subTest(f'Generating random arguments, iteration: {i}'):
-                random_count=str(random.randrange(1,100))
-                lines_of_stdout=CLI.generate(['--count',random_count])
-                
-                self.assertPasswordsCount(lines_of_stdout,len(lines_of_stdout))
-                self.assertPasswordsAreGivenLength(lines_of_stdout,self.DEFAULT_LENGTH)
-        
-    def test_generate_with_random_arguments(self):
-        
-        for i in range(0,10):
-            with self.subTest(f'Generating random arguments, iteration: {i}'):
-                random_length=str(random.randrange(1,100))
-                random_count=str(random.randrange(1,100))
-                lines_of_stdout=CLI.generate(['--length',random_length,'--count',random_count])
-                
-                self.assertPasswordsCount(lines_of_stdout,len(lines_of_stdout))
 
-                self.assertPasswordsArePasswords(lines_of_stdout,self.PASSWORD_PATTERN)
-                self.assertPasswordIsTheGivenLength(lines_of_stdout,random_length)
+        
+    def test__only_length_is_random(self):
+        for i in range(0,self.SUBSTEST_COUNT):
+            random_length=random.randrange(1,self.SUBSTEST_COUNT)
+            with self.subTest(f'Length: {random_length}'):
+                lines_of_stdout=CLI.generate(length=random_length)
+                self.assertPasswordsWereGeneratedCorrectly(lines_of_stdout,expected_length=random_length)
+                
+    
+    
+    
+        
+    def test_only_count_is_random(self):
+        for i in range(0,self.SUBSTEST_COUNT):
+            random_count=random.randrange(1,self.SUBSTEST_COUNT)
+            with self.subTest(f'Count: {random_count}'):
+                lines_of_stdout=CLI.generate(count=random_count)
+                self.assertPasswordsWereGeneratedCorrectly(lines_of_stdout,expected_length=CLI.DEFAULT_LENGTH,expected_count=random_count)
+                
+
+        
+    def test_using_random_arguments_for_count_and_length(self):
+        
+        for i in range(0,self.SUBSTEST_COUNT):
+            random_count=random.randrange(1,self.SUBSTEST_COUNT)
+            random_length=random.randrange(1,self.SUBSTEST_COUNT)
+            with self.subTest(f'Count:  {random_count}, Length: {random_length}'):
+                lines_of_stdout=CLI.generate(count=random_count,length=random_length)
+                self.assertPasswordsWereGeneratedCorrectly(lines_of_stdout,expected_length=random_length,expected_count=random_count)
+
             
     
-    def test_generate_can_save_passwords_to_file(self):
+    def test_can_save_passwords_to_new_file(self):
         output_path=CLI.TMP_PATH.joinpath('passwords.txt')
-        CLI.generate(['--output',output_path.__str__()])
+        os.remove(output_path)
+        CLI.generate(output=str(output_path))
         with open(output_path,'r',encoding='utf-8') as f:
-            passwords=f.readlines()
+            passwords=list(map(lambda x: x.strip(),f.readlines()))
+            
             self.assertIsNotNone(passwords,'Passwords are not being saved into a file')
+            self.assertPasswordsWereGeneratedCorrectly(passwords)
+            
+    def test_can_replace_file_when_confirming(self):
+        output_path=CLI.TMP_PATH.joinpath('passwords.txt')
+        with open(output_path,'w',encoding='utf-8') as f:
+            f.write('This is a file')
+        
+        with open(CLI.SCREENS_PATH.joinpath('generate/replace.txt'),'r',encoding='utf-8') as f:
+            question=CLI.generate(output=str(output_path))
+            expected_question=f.readline().strip()
+            self.assertEqual(question[0],expected_question,'Question is different from expected')
+
         
         
         

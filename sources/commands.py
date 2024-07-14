@@ -7,7 +7,7 @@ import typing as t
 import os
 import uuid
 import sys
-import sources.prompts as p
+from sources.prompts import Prompt as p
 import sources.core as core
 
 
@@ -45,7 +45,7 @@ def generate(length: int=DEFAULT_LENGTH,count: int=DEFAULT_COUNT,output_path : t
         exit(0)
     
     mode="x"
-    if os.path.exists(output_path) and os.path.isfile(output_path) and p.prompt_to_replace_file():
+    if os.path.exists(output_path) and os.path.isfile(output_path) and p.prompt_to_replace_existing_file():
         mode="w"
         
 
