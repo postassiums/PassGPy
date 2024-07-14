@@ -53,7 +53,7 @@ def generate(length: int=DEFAULT_LENGTH,count: int=DEFAULT_COUNT,output_path : t
         with open(output_path,mode) as f:
             core.write_passwords_to_file_descriptor(passwords,f)
     except FileExistsError:
-        rich.print("[red] Please choose another file name [/red]")
+        rich.print("[red] Please choose another file name [/red]",file=sys.stderr)
     except Exception as e:
         rich.print(f"[red] {e} [/red]")
         exit(1)

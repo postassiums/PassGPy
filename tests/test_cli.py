@@ -14,7 +14,7 @@ class CLI():
 
     
     @classmethod
-    def generate(cls,count : int=DEFAULT_COUNT,length : int=DEFAULT_LENGTH,output : str=None,strip_stdout : bool=True):
+    def generate(cls,count : int=DEFAULT_COUNT,length : int=DEFAULT_LENGTH,output : str=None,strip_stdout : bool=True,input: str=None):
         arguments=['generate']
         argument_map={
             '--count':count,
@@ -26,18 +26,20 @@ class CLI():
                 arguments.append(arg)
                 arguments.append(str(value))
 
-        std_out=cls.run_command(arguments)
+        std_out=cls.run_command(arguments,input)
         if strip_stdout:
             std_out=list(map(lambda x: x.strip(),std_out))
         
         return std_out
     
     @classmethod
-    def run_command(cls,args : list[str]=[])-> list[str]:
+    def run_command(cls,args : list[str]=[],input : str=None)-> list[str]:
         with open(cls.TMP_PATH.joinpath('help.txt'),'w+',encoding='utf-8') as f:
             process_args=['python3','.']
             process_args.extend(args)
-            process : subprocess.CompletedProcess =subprocess.run(process_args,stdout=f,stderr=subprocess.DEVNULL,stdin=subprocess.DEVNULL)
+            stdin=None if input is not None else subprocess.DEVNULL
+            stderr=subprocess.DEVNULL
+            process : subprocess.CompletedProcess =subprocess.run(process_args,stdout=f,stderr=stderr,stdin=stdin,input=input,encoding='utf-8')
             try:
                 process.check_returncode()
             except subprocess.CalledProcessError as e:
@@ -142,6 +144,8 @@ class TestGenerateCommand(MyTestCase):
 
     def setUp(self) -> None:
         self.SUBSTEST_COUNT=10
+        self.OUTPUT_PATH=CLI.TMP_PATH.joinpath('passwords.txt')
+        self.DUMB_TEXT='This is a file'
 
 
     
@@ -194,15 +198,37 @@ class TestGenerateCommand(MyTestCase):
             self.assertIsNotNone(passwords,'Passwords are not being saved into a file')
             self.assertPasswordsWereGeneratedCorrectly(passwords)
             
-    def test_can_replace_file_when_confirming(self):
-        output_path=CLI.TMP_PATH.joinpath('passwords.txt')
-        with open(output_path,'w',encoding='utf-8') as f:
-            f.write('This is a file')
+    def test_can_overwrite_file_when_confirming(self):
+
+        with open(self.OUTPUT_PATH,'w+',encoding='utf-8') as f:
+            f.write(self.DUMB_TEXT)
+            f.seek(0)
         
-        with open(CLI.SCREENS_PATH.joinpath('generate/replace.txt'),'r',encoding='utf-8') as f:
-            question=CLI.generate(output=str(output_path))
-            expected_question=f.readline().strip()
-            self.assertEqual(question[0],expected_question,'Question is different from expected')
+            with open(CLI.SCREENS_PATH.joinpath(pathlib.Path('generate/replace.txt')),'r',encoding='utf-8') as screen_file:
+                question=CLI.generate(output=str(self.OUTPUT_PATH),input='y\n')
+                expected_question=screen_file.readline().strip()
+                self.assertEqual(question[0],expected_question,'Question is different from expected')
+            
+
+            passwords=list(map(lambda x: x.strip(),f.readlines()))
+            self.assertFalse(self.DUMB_TEXT in passwords,'File was not overwritten')
+            self.assertPasswordsWereGeneratedCorrectly(passwords)
+            
+    def test_can_not_overwrite_file_when_not_confirming(self):
+
+        with open(self.OUTPUT_PATH,'w+',encoding='utf-8') as f:
+            f.write(self.DUMB_TEXT)
+            f.seek(0)
+        
+            with open(CLI.SCREENS_PATH.joinpath(pathlib.Path('generate/replace.txt')),'r',encoding='utf-8') as screen_file:
+                question=CLI.generate(output=str(self.OUTPUT_PATH),input='n\n')
+                expected_question=screen_file.readline().strip()
+                self.assertEqual(question[0],expected_question,'Question is different from expected')
+            file_coutent=f.readline().strip()
+            self.assertTrue(self.DUMB_TEXT in file_coutent,'File was overwritten')
+            
+
+
 
         
         
