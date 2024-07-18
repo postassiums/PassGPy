@@ -2,7 +2,7 @@ name: passg-python
 services:
   app:
     build: .
-    command: generate
+    command: gui
     environment:
       - DISPLAY
     volumes:
