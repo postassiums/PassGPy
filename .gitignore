@@ -164,4 +164,4 @@ cython_debug/
 .idea/
 # */tmp/**/*
 docker-compose.yml
-tests/tmp/
+tests/tmp/*.txt
