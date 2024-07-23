@@ -1,8 +1,10 @@
 import tkinter as tk
 from tkinter import font as tkfont
-from sources.commands import CLIApp
+from tkinter import filedialog
+from sources.commands import DEFAULT_COUNT,DEFAULT_LENGTH
 import typing as t
 import sys
+import pathlib
 
 class GUI:
     
@@ -12,25 +14,31 @@ class GUI:
     
     WINDOW_HEIGHT : t.Final[int]=600
     WINDOW_WIDTH : t.Final[int]=600
+    output_path: t.Optional[pathlib.Path]=None
     
     def __init__(self) -> None:
+        self.setup_root()
         self.create_widgets()
         self.setup_bindings()
         self.setup_layout()
         
 
-
+    def setup_root(self):
+        self.root=tk.Tk()
+        self.root.title("Simple Password Generator")
+        self.root.geometry(f"{self.WINDOW_WIDTH}x{self.WINDOW_HEIGHT}")
+        self.root.iconphoto(False,tk.PhotoImage(file='assets/gpg.png'))
+        
+        self.root.resizable(False,False)
+        
+        
 
           
     def create_widgets(self):
-        self.root=tk.Tk()
-        self.root.title("Simple Password Generator")
         
         MAX_SCREEN_WIDTH : t.Final[int]=int(self.root.winfo_screenwidth())
         MAX_SCREEN_HEIGHT : t.Final[int]=int(self.root.winfo_screenheight())
-        self.root.geometry(f"{self.WINDOW_WIDTH}x{self.WINDOW_HEIGHT}")
-        
-        self.root.resizable(False,False)
+
         
         self.font=tkfont.Font(root=self.root,family='Ariel',size=14)
         
@@ -38,7 +46,6 @@ class GUI:
         
         
         CHARACTER_WIDHT : t.Final[int]=self.font.measure('A')
-        print(CHARACTER_WIDHT)
         CHARACTER_HEIGHT : t.Final[int]=self.font.metrics('linespace')
         MAX_LENGTH_SLIDER_WIDTH : t.Final[int]=int(MAX_SCREEN_WIDTH/CHARACTER_WIDHT)
         MAX_COUNT_SLIDER_HEIGHT : t.Final[int]=int(MAX_SCREEN_HEIGHT/CHARACTER_HEIGHT)
@@ -47,8 +54,9 @@ class GUI:
         
         self.states : dict[str,tk.Variable]={
             'write_to_file': tk.BooleanVar(),
-            'length_slider': tk.IntVar(value=CLIApp.DEFAULT_LENGTH),
-            "count_slider": tk.IntVar(value=CLIApp.DEFAULT_COUNT)
+            'length_slider': tk.IntVar(value=DEFAULT_LENGTH),
+            "count_slider": tk.IntVar(value=DEFAULT_COUNT),
+            'textbox': tk.StringVar(),
         }
         self.widgets : dict[str,tk.Widget]={
             'length_slider':tk.Scale(self.root,from_=1,bigincrement=1,to=MAX_LENGTH_SLIDER_WIDTH,length=SLIDERS_LENGTH,variable=self.states['length_slider'],
@@ -56,10 +64,10 @@ class GUI:
             'count_slider':tk.Scale(self.root,from_=1,bigincrement=1,to=MAX_COUNT_SLIDER_HEIGHT,length=SLIDERS_LENGTH,variable=self.states['count_slider'],
                                     command=self.on_count_change,orient=tk.HORIZONTAL,label='Count'),
             'checkbox':tk.Checkbutton(self.root,text='Write to file',variable=self.states['write_to_file'],command=self.on_checkbox_check),
-            'textbox':tk.Text(self.root,height=CLIApp.DEFAULT_COUNT,width=CLIApp.DEFAULT_LENGTH,font=self.font),
-            'file_picker':tk.Entry(self.root,cursor='hand1'),
+            'textbox':tk.Text(self.root,height=DEFAULT_COUNT,width=DEFAULT_LENGTH,font=self.font),
+            'file_picker':tk.Button(self.root,text='...',command=self.on_file_picker),
             'generate_button':tk.Button(self.root,text='Generate',command=self.on_generate),
-            'copy_button': tk.Button(self.root,text='Copy')
+            'copy_button': tk.Button(self.root,text='Copy',command=self.on_copy)
             
             
         } 
@@ -80,13 +88,38 @@ class GUI:
             for password in passwords:
                 self.widgets['textbox'].insert(tk.END,password+'\n')
             return
+        if self.output_path is None:
+            return
+        
+        with open(self.output_path,'w') as file:
+            for password in passwords:
+                file.write(password+'\n')
+            self.disable_generate_button()
+            self.output_path=None        
+        
+        
+    def on_file_picker(self):
+
+        file_path=filedialog.asksaveasfilename(title='Save passwords to File',confirmoverwrite=True,defaultextension='.txt')
+        if not(file_path):
+            self.disable_generate_button()
+            return
+        file_path=pathlib.Path(file_path)
+        self.output_path=file_path
+        self.enable_generate_button()
+            
+        
+    def on_copy(self):
+        passwords=self.widgets['textbox'].get('1.0',tk.END)
+        self.root.clipboard_clear()
+        self.root.clipboard_append(passwords)
         
     def setup_bindings(self):
         # When pressing CTRL+A, select all text in the textbox
         self.widgets['textbox'].bind('<Control-a>',self.highlight_text)
+        self.widgets['textbox'].bind('<Key>',lambda a: 'break')
         
     def highlight_text(self,event : tk.Event):
-        print('highlight')
         self.widgets['textbox'].tag_add(tk.SEL,'1.0',tk.END)
         return 'break'
         
@@ -99,7 +132,8 @@ class GUI:
         self.widgets['textbox'].config(width=length_slider)
         
     def on_count_change(self,event):
-        self.widgets['textbox'].config(height=self.states['count_slider'].get())
+        count_slider=self.states['count_slider'].get()
+        self.widgets['textbox'].config(height=count_slider)
         
     def hide_text_box(self):
         self.widgets['textbox'].pack_forget()
@@ -113,14 +147,22 @@ class GUI:
     def show_file_picker(self):
         self.widgets['file_picker'].pack(**self.PACK_OPTIONS)
         
+    def disable_generate_button(self):
+        self.widgets['generate_button'].config(state=tk.DISABLED)
+        
+    def enable_generate_button(self):
+        self.widgets['generate_button'].config(state=tk.NORMAL)
+        
     def on_checkbox_check(self):
         if self.states['write_to_file'].get():
+            self.disable_generate_button()
             self.show_file_picker()
             self.hide_text_box()
             return
             
         self.hide_file_picker()
         self.show_text_box()
+        self.enable_generate_button()
         
     def setup_layout(self):
 

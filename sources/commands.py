@@ -61,4 +61,6 @@ def generate(length: int=DEFAULT_LENGTH,count: int=DEFAULT_COUNT,output_path : t
 
 @app.command()
 def gui():
-    pass
+    from sources.window import GUI
+    myGui=GUI()
+    myGui.run()
